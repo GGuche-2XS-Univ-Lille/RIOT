@@ -482,7 +482,7 @@ static int _unlink(vfs_mount_t *vfs_mp, const char *name)
     mutex_lock(mp->mutex);
     ret = xipfs_unlink(mp, name);
     mutex_unlock(mp->mutex);
-    mutex_lock(mp->execution_mutex);
+    mutex_unlock(mp->execution_mutex);
 
     return ret;
 }
@@ -875,6 +875,10 @@ int xipfs_construct_from_flashpage(mtd_flashpage_t *flashpage, const char *path,
     vfs_xipfs_mount->page_addr  = (void *)(
           (unsigned char *)XIPFS_NVM_BASE
         + (flashpage->offset * XIPFS_NVM_PAGE_SIZE)
+        );
+    vfs_xipfs_mount->page_end_addr = (void *)(
+           vfs_xipfs_mount->page_addr
+        +  (vfs_xipfs_mount->page_num * XIPFS_NVM_PAGE_SIZE)
         );
     vfs_xipfs_mount->execution_mutex = execution_mutex;
     mutex_init(vfs_xipfs_mount->execution_mutex);

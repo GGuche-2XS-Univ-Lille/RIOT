@@ -60,8 +60,43 @@ extern "C" {
         .mount_path = path,                           \
         .page_num = num,                              \
         .page_addr = (void *)xipfs_part_##id,         \
+        .page_end_addr = (void *)(                    \
+            (char *)xipfs_part_##id +                 \
+            (num * XIPFS_NVM_PAGE_SIZE) ),            \
         .execution_mutex = &execution_mutex_##id,     \
         .mutex = &mutex_##id                          \
+    }
+
+#define XIPFS_STR_HELPER(x) #x
+#define XIPFS_STR(x) XIPFS_STR_HELPER(x)
+
+#define XIPFS_INCLUDE_PARTITION(id, path, filename)             \
+    __asm__ (                                                   \
+        ".align " XIPFS_STR(XIPFS_NVM_PAGE_ASM_ALIGNMENT) "\n"  \
+        ".section .rodata.xipfs_part_" XIPFS_STR(id) "\n"       \
+        ".global xipfs_part_" XIPFS_STR(id) "\n"                \
+        "xipfs_part_" XIPFS_STR(id) ":\n"                       \
+        ".incbin \"" filename "\"\n"                            \
+        ".align " XIPFS_STR(XIPFS_NVM_PAGE_ASM_ALIGNMENT) "\n"  \
+        ".global xipfs_part_" XIPFS_STR(id) "_end\n"            \
+        "xipfs_part_" XIPFS_STR(id) "_end:\n"                   \
+    );                                                          \
+    extern const uint8_t xipfs_part_##id[];                     \
+    extern const uint8_t xipfs_part_##id##_end[];               \
+    static mutex_t execution_mutex_##id = MUTEX_INIT;           \
+    static mutex_t mutex_##id = MUTEX_INIT;                     \
+    static vfs_xipfs_mount_t id = {                             \
+        .vfs_mp = {                                             \
+            .fs = &xipfs_file_system,                           \
+            .mount_point = path,                                \
+        },                                                      \
+        .magic = XIPFS_MAGIC,                                   \
+        .mount_path = path,                                     \
+        .page_num = XIPFS_PAGE_NUM_INVALID,                     \
+        .page_addr = (void *)&xipfs_part_##id,                  \
+        .page_end_addr = (void *)&xipfs_part_##id##_end,        \
+        .execution_mutex = &execution_mutex_##id,               \
+        .mutex = &mutex_##id                                    \
     }
 
 /**
@@ -80,6 +115,7 @@ typedef struct vfs_xipfs_mount_s {
     const char *mount_path;  /**< mount point path         */
     size_t page_num;         /**< number of flash page     */
     void *page_addr;         /**< first flash page address */
+    void *page_end_addr;     /**< end flash address not included in mount point range. */
     mutex_t *execution_mutex;/**< For execution and deletion operations */
     mutex_t *mutex;          /**< For regular and deletion operations */
 } vfs_xipfs_mount_t;

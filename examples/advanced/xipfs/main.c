@@ -58,6 +58,11 @@ XIPFS_NEW_PARTITION(nvme0p0, "/nvme0p0", NVME0P0_PAGE_NUM);
  */
 XIPFS_NEW_PARTITION(nvme0p1, "/nvme0p1", NVME0P1_PAGE_NUM);
 
+/*
+ * Include a mount point image that has been build on a PC workstation
+ */
+XIPFS_INCLUDE_PARTITION(nvme0p2, "/nvme0p2", "example.flash");
+
 #ifdef BOARD_DWM1001
 
 /**
@@ -196,6 +201,16 @@ int main(void)
 
     mount_or_format(&nvme0p0);
     mount_or_format(&nvme0p1);
+
+    if (vfs_mount(&nvme0p2.vfs_mp) < 0) {
+        printf("vfs_mount: \"%s\": file system has not been "
+            "initialized or is corrupted\n", nvme0p2.vfs_mp.mount_point);
+        PANIC();
+    }
+    else
+    {
+        printf("vfs_mount: \"%s\": OK\n", nvme0p2.vfs_mp.mount_point);
+    }
 
     shell_run(shell_commands, line_buf, SHELL_DEFAULT_BUFSIZE);
 
