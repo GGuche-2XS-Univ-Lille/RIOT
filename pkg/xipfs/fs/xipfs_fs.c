@@ -714,7 +714,27 @@ static const void *xipfs_extended_driver_execv_syscalls[XIPFS_SYSCALL_MAX] = {
     [      XIPFS_SYSCALL_SET_LED] = set_led,
     [    XIPFS_SYSCALL_COPY_FILE] = copy_file,
     [XIPFS_SYSCALL_GET_FILE_SIZE] = get_file_size,
-    [       XIPFS_SYSCALL_MEMSET] = memset
+    [       XIPFS_SYSCALL_MEMSET] = memset,
+    [       XIPFS_SYSCALL_MEMCMP] = memcmp,
+    [       XIPFS_SYSCALL_STRCMP] = strcmp,
+    [      XIPFS_SYSCALL_STRNCMP] = strncmp,
+
+    /* VFS */
+    [          XIPFS_SYSCALL_VFS_OPEN] = vfs_open,
+    [         XIPFS_SYSCALL_VFS_CLOSE] = vfs_close,
+    [         XIPFS_SYSCALL_VFS_LSEEK] = vfs_lseek,
+    [         XIPFS_SYSCALL_VFS_WRITE] = vfs_write,
+    [          XIPFS_SYSCALL_VFS_READ] = vfs_read,
+    [      XIPFS_SYSCALL_VFS_READLINE] = vfs_readline,
+    [          XIPFS_SYSCALL_VFS_STAT] = vfs_stat,
+    [         XIPFS_SYSCALL_VFS_FSTAT] = vfs_fstat,
+    [       XIPFS_SYSCALL_VFS_STATVFS] = vfs_statvfs,
+    [      XIPFS_SYSCALL_VFS_FSTATVFS] = vfs_fstatvfs,
+    [        XIPFS_SYSCALL_VFS_RENAME] = vfs_rename,
+    [XIPFS_SYSCALL_VFS_NORMALIZE_PATH] = vfs_normalize_path,
+    [         XIPFS_SYSCALL_VFS_FSYNC] = vfs_fsync,
+    [         XIPFS_SYSCALL_VFS_FCNTL] = vfs_fcntl,
+    [         XIPFS_SYSCALL_VFS_MKDIR] = vfs_mkdir,
 };
 
 int xipfs_extended_driver_execv(const char *full_path, char *const argv[])
@@ -791,7 +811,27 @@ static const void *xipfs_extended_driver_safe_execv_syscalls[XIPFS_SYSCALL_MAX] 
     [      XIPFS_SYSCALL_SET_LED] = set_led,
     [    XIPFS_SYSCALL_COPY_FILE] = copy_file,
     [XIPFS_SYSCALL_GET_FILE_SIZE] = get_file_size,
-    [       XIPFS_SYSCALL_MEMSET] = memset
+    [       XIPFS_SYSCALL_MEMSET] = memset,
+    [       XIPFS_SYSCALL_MEMCMP] = memcmp,
+    [       XIPFS_SYSCALL_STRCMP] = strcmp,
+    [      XIPFS_SYSCALL_STRNCMP] = strncmp,
+
+    /* VFS */
+    [          XIPFS_SYSCALL_VFS_OPEN] = vfs_open,
+    [         XIPFS_SYSCALL_VFS_CLOSE] = vfs_close,
+    [         XIPFS_SYSCALL_VFS_LSEEK] = vfs_lseek,
+    [         XIPFS_SYSCALL_VFS_WRITE] = vfs_write,
+    [          XIPFS_SYSCALL_VFS_READ] = vfs_read,
+    [      XIPFS_SYSCALL_VFS_READLINE] = vfs_readline,
+    [          XIPFS_SYSCALL_VFS_STAT] = vfs_stat,
+    [         XIPFS_SYSCALL_VFS_FSTAT] = vfs_fstat,
+    [       XIPFS_SYSCALL_VFS_STATVFS] = vfs_statvfs,
+    [      XIPFS_SYSCALL_VFS_FSTATVFS] = vfs_fstatvfs,
+    [        XIPFS_SYSCALL_VFS_RENAME] = vfs_rename,
+    [XIPFS_SYSCALL_VFS_NORMALIZE_PATH] = vfs_normalize_path,
+    [         XIPFS_SYSCALL_VFS_FSYNC] = vfs_fsync,
+    [         XIPFS_SYSCALL_VFS_FCNTL] = vfs_fcntl,
+    [         XIPFS_SYSCALL_VFS_MKDIR] = vfs_mkdir,
 };
 
 int xipfs_extended_driver_safe_execv(const char *full_path, char *const argv[])

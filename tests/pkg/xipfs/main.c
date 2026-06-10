@@ -3488,7 +3488,27 @@ static const void *fake_syscalls[XIPFS_SYSCALL_MAX] = {
     [      XIPFS_SYSCALL_SET_LED] = fake_syscall,
     [    XIPFS_SYSCALL_COPY_FILE] = fake_syscall,
     [XIPFS_SYSCALL_GET_FILE_SIZE] = fake_syscall,
-    [       XIPFS_SYSCALL_MEMSET] = fake_syscall
+    [       XIPFS_SYSCALL_MEMSET] = fake_syscall,
+    [       XIPFS_SYSCALL_MEMCMP] = fake_syscall,
+    [       XIPFS_SYSCALL_STRCMP] = fake_syscall,
+    [      XIPFS_SYSCALL_STRNCMP] = fake_syscall,
+
+    /* VFS */
+    [          XIPFS_SYSCALL_VFS_OPEN] = fake_syscall,
+    [         XIPFS_SYSCALL_VFS_CLOSE] = fake_syscall,
+    [         XIPFS_SYSCALL_VFS_LSEEK] = fake_syscall,
+    [         XIPFS_SYSCALL_VFS_WRITE] = fake_syscall,
+    [          XIPFS_SYSCALL_VFS_READ] = fake_syscall,
+    [      XIPFS_SYSCALL_VFS_READLINE] = fake_syscall,
+    [          XIPFS_SYSCALL_VFS_STAT] = fake_syscall,
+    [         XIPFS_SYSCALL_VFS_FSTAT] = fake_syscall,
+    [       XIPFS_SYSCALL_VFS_STATVFS] = fake_syscall,
+    [      XIPFS_SYSCALL_VFS_FSTATVFS] = fake_syscall,
+    [        XIPFS_SYSCALL_VFS_RENAME] = fake_syscall,
+    [XIPFS_SYSCALL_VFS_NORMALIZE_PATH] = fake_syscall,
+    [         XIPFS_SYSCALL_VFS_FSYNC] = fake_syscall,
+    [         XIPFS_SYSCALL_VFS_FCNTL] = fake_syscall,
+    [         XIPFS_SYSCALL_VFS_MKDIR] = fake_syscall,
 };
 
 static void
