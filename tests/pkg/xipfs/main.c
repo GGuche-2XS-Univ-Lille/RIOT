@@ -40,7 +40,7 @@
  *
  * @brief The number of flash page for the nvme0p0 file system
  */
-#define NVME0P0_PAGE_NUM 20
+#define NVME0P0_PAGE_NUM (XIPFS_MAX_OPEN_DESC + 1)
 
 #define XIPFS_ASSERT(condition)       \
 do {                                  \
@@ -53,7 +53,18 @@ do {                                  \
 /*
  * Allocate a new contiguous space for the nvme0p0 file system
  */
-XIPFS_NEW_PARTITION(nvme0p0, "/dev/nvme0p0", NVME0P0_PAGE_NUM);
+XIPFS_NEW_PARTITION(nvme0p0, "/nvme0p0", NVME0P0_PAGE_NUM);
+
+/*
+ * Include a mount point image that has been built on a PC workstation.
+ *
+ * Please mind the deliberate missing semicolon character after
+ * XIPFS_START_PARTITION_INCLUSION(nvme0p1).
+ */
+static
+XIPFS_START_PARTITION_INCLUSION(nvme0p1)
+#include "blob/nvme0p1.flash.h"
+XIPFS_END_PARTITION_INCLUSION(nvme0p1, "/nvme0p1", nvme0p1_flash, nvme0p1_flash_len);
 
 /*
  * Get a pointer to an xipfs_mount_t from a vfs_xipfs_mount_t
@@ -189,7 +200,12 @@ static void test_xipfs_stat_enametoolong_path(void);
 static void test_xipfs_stat_enotdir_path(void);
 static void test_xipfs_stat_enoent_path(void);
 static void test_xipfs_stat_ok(void);
+static void test_xipfs_statvfs_efault_path(void);
 static void test_xipfs_statvfs_efault_buf(void);
+static void test_xipfs_statvfs_enoent_path_null_char(void);
+static void test_xipfs_statvfs_enametoolong_path(void);
+static void test_xipfs_statvfs_enotdir_path(void);
+static void test_xipfs_statvfs_enoent_path(void);
 static void test_xipfs_statvfs_ok(void);
 static void test_xipfs_new_file_efault_path(void);
 static void test_xipfs_new_file_enoent_path_null_char(void);
@@ -408,7 +424,12 @@ void test_xipfs_suite(vfs_xipfs_mount_t *vfs_xipfs_mount) {
     test_xipfs_stat_ok();
 
     /* xipfs_statvfs */
+    test_xipfs_statvfs_efault_path();
     test_xipfs_statvfs_efault_buf();
+    test_xipfs_statvfs_enoent_path_null_char();
+    test_xipfs_statvfs_enametoolong_path();
+    test_xipfs_statvfs_enotdir_path();
+    test_xipfs_statvfs_enoent_path();
     test_xipfs_statvfs_ok();
 
     /* xipfs_new_file */
@@ -479,6 +500,293 @@ void test_xipfs_suite(vfs_xipfs_mount_t *vfs_xipfs_mount) {
     printf("Tests finished.\n");
 }
 
+static void test_executable_syscalls_setup(void)
+{
+    int ret = vfs_format(&nvme0p0.vfs_mp);
+    XIPFS_ASSERT(ret == 0);
+
+    ret = vfs_mount(&nvme0p0.vfs_mp);
+    XIPFS_ASSERT(ret == 0);
+
+    ret = vfs_mount(&nvme0p1.vfs_mp);
+    XIPFS_ASSERT(ret == 0);
+}
+
+static void test_executable_syscalls_teardown(void)
+{
+    int ret = vfs_umount(&nvme0p1.vfs_mp, true);
+    XIPFS_ASSERT(ret == 0);
+
+    ret = vfs_umount(&nvme0p0.vfs_mp, true);
+    XIPFS_ASSERT(ret == 0);
+}
+
+typedef int (*xipfs_extended_driver_exec_func_t)(const char *full_path, char *const argv[]);
+
+static void
+test_executable_memcmp_syscalls_base(xipfs_extended_driver_exec_func_t exec_func)
+{
+    test_executable_syscalls_setup();
+
+    char executable_filename[] = "/nvme0p1/memcmp.fae";
+    char *args[] =
+    {
+        executable_filename, NULL, NULL
+    };
+    int ret;
+
+    args[1] = "memcmp";
+    ret = exec_func(executable_filename, args);
+    XIPFS_ASSERT(ret == 0);
+
+    args[1] = "strcmp";
+    ret = exec_func(executable_filename, args);
+    XIPFS_ASSERT(ret == 0);
+
+    args[1] = "strncmp";
+    ret = exec_func(executable_filename, args);
+    XIPFS_ASSERT(ret == 0);
+
+    test_executable_syscalls_teardown();
+}
+
+typedef struct {
+    char *stat_arg;
+    char *fstat_arg;
+    char *statvfs_arg;
+    char *fstatvfs_arg;
+    char *rw_arg;
+    char *normalize_path_arg;
+    char *rename_arg;
+    char *fsync_arg;
+    char *fcntl_arg;
+    char *mkdir_arg;
+} test_executable_vfs_syscalls_args_t;
+
+static void
+test_executable_vfs_syscalls_base_ex(xipfs_extended_driver_exec_func_t exec_func,
+                                     const test_executable_vfs_syscalls_args_t *syscalls_args)
+{
+    test_executable_syscalls_setup();
+
+    char executable_filename[] = "/nvme0p1/vfs.fae";
+    char *args[] =
+    {
+        executable_filename, NULL, NULL, NULL, NULL
+    };
+    int ret;
+
+    args[1] = syscalls_args->stat_arg;
+    args[2] = executable_filename;
+    args[3] = NULL;
+    ret = exec_func(executable_filename, args);
+    XIPFS_ASSERT(ret == 0);
+
+    args[1] = syscalls_args->fstat_arg;
+    args[2] = executable_filename;
+    args[3] = NULL;
+    ret = exec_func(executable_filename, args);
+    XIPFS_ASSERT(ret == 0);
+
+    args[1] = syscalls_args->statvfs_arg;
+    args[2] = executable_filename;
+    args[3] = NULL;
+    ret = exec_func(executable_filename, args);
+    XIPFS_ASSERT(ret == 0);
+
+    args[1] = syscalls_args->fstatvfs_arg;
+    args[2] = executable_filename;
+    args[3] = NULL;
+    ret = exec_func(executable_filename, args);
+    XIPFS_ASSERT(ret == 0);
+
+    args[1] = syscalls_args->rw_arg;
+    args[2] = "/nvme0p0/test_rw.txt";
+    args[3] = NULL;
+    ret = exec_func(executable_filename, args);
+    XIPFS_ASSERT(ret == 0);
+
+    args[1] = syscalls_args->normalize_path_arg;
+    args[2] = NULL;
+    ret = exec_func(executable_filename, args);
+    XIPFS_ASSERT(ret == 0);
+
+    args[1] = syscalls_args->rename_arg;
+    args[2] = "/nvme0p0/test_rename.txt";
+    args[3] = "/nvme0p0/testor_rename_done.txt";
+    args[4] = NULL;
+    ret = exec_func(executable_filename, args);
+    XIPFS_ASSERT(ret == 0);
+
+    args[1] = syscalls_args->fsync_arg;
+    args[2] = "/nvme0p0/test_fsync.txt";
+    args[3] = NULL;
+    ret = exec_func(executable_filename, args);
+    XIPFS_ASSERT(ret == 0);
+
+    args[1] = syscalls_args->fcntl_arg;
+    args[2] = "/nvme0p0/test_fcntl.txt";
+    args[3] = NULL;
+    ret = exec_func(executable_filename, args);
+    XIPFS_ASSERT(ret == 0);
+
+    args[1] = syscalls_args->mkdir_arg;
+    args[2] = "/nvme0p0/test_mkdir";
+    args[3] = NULL;
+    ret = exec_func(executable_filename, args);
+    XIPFS_ASSERT(ret == 0);
+
+    test_executable_syscalls_teardown();
+}
+
+static const test_executable_vfs_syscalls_args_t libc_args = {
+    .stat_arg           = "stat",
+    .fstat_arg          = "fstat",
+    .statvfs_arg        = "statvfs",
+    .fstatvfs_arg       = "fstatvfs",
+    .rw_arg             = "rw",
+    .normalize_path_arg = "vfs_normalize_path",
+    .rename_arg         = "rename",
+    .fsync_arg          = "fsync",
+    .fcntl_arg          = "fcntl",
+    .mkdir_arg          = "mkdir",
+};
+
+static const test_executable_vfs_syscalls_args_t vfs_args = {
+    .stat_arg           = "vfs_stat",
+    .fstat_arg          = "vfs_fstat",
+    .statvfs_arg        = "vfs_statvfs",
+    .fstatvfs_arg       = "vfs_fstatvfs",
+    .rw_arg             = "vfs_rw",
+    .normalize_path_arg = "vfs_normalize_path",
+    .rename_arg         = "vfs_rename",
+    .fsync_arg          = "vfs_fsync",
+    .fcntl_arg          = "vfs_fcntl",
+    .mkdir_arg          = "vfs_mkdir",
+};
+
+static void
+test_executable_vfs_syscalls_base(xipfs_extended_driver_exec_func_t exec_func)
+{
+    test_executable_vfs_syscalls_base_ex(exec_func, &libc_args);
+    test_executable_vfs_syscalls_base_ex(exec_func, &vfs_args);
+}
+
+static_assert(VFS_MAX_OPEN_FILES <= XIPFS_MAX_OPEN_DESC);
+
+static void
+test_executable_file_desc_leak_base(xipfs_extended_driver_exec_func_t exec_func)
+{
+    test_executable_syscalls_setup();
+
+    char executable_filename[] = "/nvme0p1/leak-desc.fae";
+    char *args[] =
+    {
+        executable_filename, "files", "/nvme0p0", NULL, NULL, NULL, NULL
+    };
+    int ret;
+    char buffer0[64];
+    char buffer1[64];
+
+    /* First populate RIOT VFS tracking, knowing that the first 3 slots are
+     * reserved for STDIN, STDOUT, STDERR. */
+    const size_t vfs_max_open_files = (size_t)(VFS_MAX_OPEN_FILES - 3);
+    ret = snprintf(buffer0, sizeof(buffer0), "%zu", vfs_max_open_files);
+    XIPFS_ASSERT( (ret >= 0) && ((unsigned)ret < sizeof(buffer0)) );
+
+    args[3] = buffer0;
+    args[4] = NULL;
+    ret = exec_func(executable_filename, args);
+    XIPFS_ASSERT(ret == 0);
+
+    /* Now try to saturate VFS tracking by adding 3 more files,
+     * with filename suffix starting at vfs_max_open_files.
+     * Should fail if file descriptors have been leaked.
+     * Should succeed when XiPFS released properly file handles.
+     */
+    args[3] = "3";
+    args[4] = buffer0;
+    args[5] = NULL;
+    ret = exec_func(executable_filename, args);
+    XIPFS_ASSERT(ret != -ENFILE);
+    XIPFS_ASSERT(ret == 0);
+
+    if (VFS_MAX_OPEN_FILES < XIPFS_MAX_OPEN_DESC) {
+        /*
+         * Fill up XiPFS own tracking system.
+         * Should succeed since nvme0p0 has reserved (XIPFS_MAX_OPEN_DESC + 1) pages
+         * of Flash.
+         */
+        ret = snprintf(buffer0, sizeof(buffer0), "%zu", (size_t)VFS_MAX_OPEN_FILES);
+
+        const size_t nb_files = (size_t)(XIPFS_MAX_OPEN_DESC - VFS_MAX_OPEN_FILES);
+        ret = snprintf(buffer1, sizeof(buffer1), "%zu", nb_files);
+        XIPFS_ASSERT( (ret >= 0) && ((unsigned)ret < sizeof(buffer1)) );
+
+        args[3] = buffer1;
+        args[4] = buffer0;
+        args[5] = NULL;
+        ret = exec_func(executable_filename, args);
+        XIPFS_ASSERT(ret == 0);
+    }
+
+    /* Try to saturate XiPFS own tracking system.
+     * Create one more file whose filename suffix is XIPFS_MAX_OPEN_DESC.
+     * Should fail when XiPFS leaked file descriptors from its own tracking system.
+     * Should succeed since /nvme0p0 has reserved (VFS_MAX_OPEN_FILES + 1) pages of Flash.
+     */
+    ret = snprintf(buffer0, sizeof(buffer0), "%zu", XIPFS_MAX_OPEN_DESC);
+    XIPFS_ASSERT( (ret >= 0) && ((unsigned)ret < sizeof(buffer0)) );
+
+    args[3] = "1";
+    args[4] = buffer0;
+    args[5] = NULL;
+    ret = exec_func(executable_filename, args);
+    XIPFS_ASSERT(ret != -ENFILE);
+    XIPFS_ASSERT(ret == 0);
+
+    /* Now nvme0p1 is full.
+     * Try to create one more file which should fail but NOT because of file descriptors tracking.
+     */
+    ret = snprintf(buffer0, sizeof(buffer0), "%zu", XIPFS_MAX_OPEN_DESC + 1);
+    XIPFS_ASSERT( (ret >= 0) && ((unsigned)ret < sizeof(buffer0)) );
+
+    args[3] = "1";
+    args[4] = buffer0;
+    args[5] = NULL;
+    ret = exec_func(executable_filename, args);
+    XIPFS_ASSERT(ret == 4); /* This is the expected return value from /nvme0p1/leak-desc.fae */
+    printf("%s %s %s %s %s failed as expected.\n", args[0], args[1], args[2], args[3], args[4]);
+
+    test_executable_syscalls_teardown();
+}
+
+static void test_executable_suite_base(const char *exec_func_name,
+                                       xipfs_extended_driver_exec_func_t exec_func)
+{
+    XIPFS_ASSERT(exec_func_name != NULL);
+    XIPFS_ASSERT(exec_func_name[0] != '\0');
+    XIPFS_ASSERT(exec_func != NULL);
+
+    printf("Executable syscalls tests (%s) started...\n", exec_func_name);
+
+    test_executable_memcmp_syscalls_base(exec_func);
+    test_executable_vfs_syscalls_base(exec_func);
+    test_executable_file_desc_leak_base(exec_func);
+
+    printf("Executable syscalls tests (%s) finished.\n", exec_func_name);
+}
+
+static inline void test_executable_suite(void)
+{
+    test_executable_suite_base("xipfs_extended_driver_execv",
+                               xipfs_extended_driver_execv);
+#ifdef XIPFS_ENABLE_SAFE_EXEC_SUPPORT
+    test_executable_suite_base("xipfs_extended_driver_safe_execv",
+                               xipfs_extended_driver_safe_execv);
+#endif
+}
+
 /*
  * Entry point
  */
@@ -500,7 +808,7 @@ int main(void)
         vfs_xipfs_mount_t  vfs_xipfs_mount;
 
         int ret = xipfs_construct_from_flashpage(
-            &mtd_flash_aux_slot, "/dev/nvme0p0",
+            &mtd_flash_aux_slot, "/nvme0p0",
             &execution_mutex, &mutex,
             &vfs_xipfs_mount);
         XIPFS_ASSERT(ret == 0);
@@ -515,6 +823,9 @@ int main(void)
         test_xipfs_suite(&vfs_xipfs_mount);
     }
 
+    test_executable_suite();
+
+    printf("All XiPFS tests have run successfully.\n");
     for (;;) {}
 }
 
@@ -3201,22 +3512,110 @@ static void test_xipfs_stat_ok(void)
     XIPFS_ASSERT(ret == 0);
 }
 
-static void test_xipfs_statvfs_efault_buf(void)
+static void test_xipfs_statvfs_efault_path(void)
 {
-    int ret;
+    struct xipfs_statvfs buf;
 
+    int ret;
     /* test */
-    ret = xipfs_statvfs(xipfs_nvme0p0, NULL, NULL);
+    ret = xipfs_statvfs(xipfs_nvme0p0, NULL, &buf);
     XIPFS_ASSERT(ret == -EFAULT);
 }
 
-static void test_xipfs_statvfs_ok(void)
+static void test_xipfs_statvfs_efault_buf(void)
+{
+    xipfs_file_desc_t desc;
+    int ret;
+
+    /* initialization */
+    ret = xipfs_open(xipfs_nvme0p0, &desc, "/toto", O_CREAT, 0);
+    XIPFS_ASSERT(ret == 0);
+
+    ret = xipfs_close(xipfs_nvme0p0, &desc);
+    XIPFS_ASSERT(ret == 0);
+
+    /* test */
+    ret = xipfs_statvfs(xipfs_nvme0p0, "/toto", NULL);
+    XIPFS_ASSERT(ret == -EFAULT);
+
+    /* clean up */
+    ret = xipfs_format(xipfs_nvme0p0);
+    XIPFS_ASSERT(ret == 0);
+}
+
+static void test_xipfs_statvfs_enoent_path_null_char(void)
 {
     struct xipfs_statvfs buf;
     int ret;
 
     /* test */
-    ret = xipfs_statvfs(xipfs_nvme0p0, NULL, &buf);
+    ret = xipfs_statvfs(xipfs_nvme0p0, "", &buf);
+    XIPFS_ASSERT(ret == -ENOENT);
+}
+
+
+static void test_xipfs_statvfs_enametoolong_path(void)
+{
+    struct xipfs_statvfs buf;
+    int ret;
+
+    /* test */
+    ret = xipfs_statvfs(xipfs_nvme0p0, "/totooooooooooooooooooooooo"
+            "ooooooooooooooooooooooooooooooooooooo", &buf);
+    XIPFS_ASSERT(ret == -ENAMETOOLONG);
+}
+
+static void test_xipfs_statvfs_enotdir_path(void)
+{
+    xipfs_file_desc_t desc;
+    struct xipfs_statvfs buf;
+    int ret;
+
+    /* initialization */
+    ret = xipfs_open(xipfs_nvme0p0, &desc, "/toto", O_CREAT, 0);
+    XIPFS_ASSERT(ret == 0);
+
+    ret = xipfs_close(xipfs_nvme0p0, &desc);
+    XIPFS_ASSERT(ret == 0);
+
+    /* test */
+    ret = xipfs_statvfs(xipfs_nvme0p0, "/toto/toto", &buf);
+    XIPFS_ASSERT(ret == -ENOTDIR);
+
+    /* clean up */
+    ret = xipfs_format(xipfs_nvme0p0);
+    XIPFS_ASSERT(ret == 0);
+}
+
+static void test_xipfs_statvfs_enoent_path(void)
+{
+    struct xipfs_statvfs buf;
+    int ret;
+
+    /* test */
+    ret = xipfs_statvfs(xipfs_nvme0p0, "/toto", &buf);
+    XIPFS_ASSERT(ret == -ENOENT);
+}
+
+static void test_xipfs_statvfs_ok(void)
+{
+    xipfs_file_desc_t desc;
+    struct xipfs_statvfs buf;
+    int ret;
+
+    /* initialization */
+    ret = xipfs_open(xipfs_nvme0p0, &desc, "/toto", O_CREAT, 0);
+    XIPFS_ASSERT(ret == 0);
+
+    ret = xipfs_close(xipfs_nvme0p0, &desc);
+    XIPFS_ASSERT(ret == 0);
+
+    /* test */
+    ret = xipfs_statvfs(xipfs_nvme0p0, "/toto", &buf);
+    XIPFS_ASSERT(ret == 0);
+
+    /* clean up */
+    ret = xipfs_format(xipfs_nvme0p0);
     XIPFS_ASSERT(ret == 0);
 }
 
@@ -3509,6 +3908,8 @@ static const void *fake_syscalls[XIPFS_SYSCALL_MAX] = {
     [         XIPFS_SYSCALL_VFS_FSYNC] = fake_syscall,
     [         XIPFS_SYSCALL_VFS_FCNTL] = fake_syscall,
     [         XIPFS_SYSCALL_VFS_MKDIR] = fake_syscall,
+
+    [         XIPFS_SYSCALL_VSNPRINTF] = fake_syscall,
 };
 
 static void
@@ -3703,7 +4104,7 @@ static void test_xipfs_safe_execv_efault_args_0_null(void)
 
 #endif /* XIPFS_ENABLE_SAFE_EXEC_SUPPORT */
 
-#define MINIMAL_FAE_FILENAME "/dev/nvme0p0/minimal.fae"
+#define MINIMAL_FAE_FILENAME "/nvme0p0/minimal.fae"
 
 static void drop_minimal_fae_file(void)
 {
