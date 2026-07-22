@@ -136,6 +136,8 @@ typedef struct vfs_xipfs_mount_s {
 /** The xipfs vfs driver */
 extern const vfs_file_system_t xipfs_file_system;
 
+bool xipfs_does_filename_belong_to_known_mountpoint(const char *filename);
+
 /**
  * @brief vfs_xipfs_mount_t constructor from a mtd_flashpage_t.
  *

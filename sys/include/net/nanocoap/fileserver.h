@@ -109,6 +109,7 @@ typedef enum {
 typedef struct {
     const char *path;               /**< VFS path of the affected file  */
     void *user_ctx;                 /**< Optional user supplied context */
+    uint32_t total_bytesize;
 } nanocoap_fileserver_event_ctx_t;
 
 /**
@@ -117,8 +118,10 @@ typedef struct {
  * @param[in] event     Type of the event
  * @param[in] ctx       Event context information
  *
+ * @retval 0 on success.
+ * @retval <0 on failure.
  */
-typedef void (*nanocoap_fileserver_event_handler_t)(nanocoap_fileserver_event_t event,
+typedef int (*nanocoap_fileserver_event_handler_t)(nanocoap_fileserver_event_t event,
                                                     nanocoap_fileserver_event_ctx_t *ctx);
 
 /**

@@ -64,6 +64,7 @@ struct requestoptions {
         bool block2          :1;    /**< Request carries a Block2 option */
         bool block1          :1;    /**< Request carries a Block1 option */
         bool size2           :1;    /**< Request carries a Size2 option */
+        bool size1           :1;    /**< Request carries a Size1 option */
     } exists;                       /**< Structure holding flags of present request options */
 };
 
@@ -183,24 +184,28 @@ static void _calc_szx2(coap_pkt_t *pdu, size_t reserve, coap_block1_t *block2)
     }
 }
 
-static inline void _event_file(nanocoap_fileserver_event_t event, struct requestdata *request)
+static inline int _event_file(nanocoap_fileserver_event_t event, struct requestdata *request,
+                               uint32_t total_bytesize)
 {
     if (!IS_USED(MODULE_NANOCOAP_FILESERVER_CALLBACK)) {
-        return;
+        return -1;
     }
 
     mutex_lock(&_event_mtx);
     nanocoap_fileserver_event_ctx_t ctx = {
         .path = request->namebuf,
         .user_ctx = _event_ctx,
+        .total_bytesize = total_bytesize
     };
 
     nanocoap_fileserver_event_handler_t cb = _event_cb;
     mutex_unlock(&_event_mtx);
 
     if (cb) {
-        cb(event, &ctx);
+        return cb(event, &ctx);
     }
+
+    return -1;
 }
 
 static ssize_t _get_file(coap_pkt_t *pdu, uint8_t *buf, size_t len,
@@ -258,7 +263,7 @@ static ssize_t _get_file(coap_pkt_t *pdu, uint8_t *buf, size_t len,
     }
 
     if (block2.blknum == 0) {
-        _event_file(NANOCOAP_FILESERVER_GET_FILE_START, request);
+        (void)_event_file(NANOCOAP_FILESERVER_GET_FILE_START, request, 0);
     }
 
     /* That'd only happen if the buffer is too small for even a 16-byte block,
@@ -287,7 +292,7 @@ static ssize_t _get_file(coap_pkt_t *pdu, uint8_t *buf, size_t len,
     }
 
     if (!more) {
-        _event_file(NANOCOAP_FILESERVER_GET_FILE_END, request);
+        (void)_event_file(NANOCOAP_FILESERVER_GET_FILE_END, request, 0);
     }
 
     return resp_len + read;
@@ -299,6 +304,7 @@ late_err:
 }
 
 #if IS_USED(MODULE_NANOCOAP_FILESERVER_PUT)
+
 static ssize_t _put_file(coap_pkt_t *pdu, uint8_t *buf, size_t len,
                          struct requestdata *request)
 {
@@ -306,7 +312,42 @@ static ssize_t _put_file(coap_pkt_t *pdu, uint8_t *buf, size_t len,
     uint32_t etag;
     struct stat stat;
     coap_block1_t block1 = {0};
-    bool create = (vfs_stat(request->namebuf, &stat) == -ENOENT);
+    bool create;
+
+    if (request->options.exists.block1 && !coap_get_block1(pdu, &block1)) {
+        ret = COAP_CODE_BAD_OPTION;
+        create = (vfs_stat(request->namebuf, &stat) == -ENOENT);
+        if (create) {
+            /* While a file 'f' is initially being created,
+            we save the partial content in '.f' and rename it afterwards */
+            if (!(ret = strlen(request->namebuf)) || (unsigned)ret >= sizeof(request->namebuf) - 1) {
+                /* need one more char '.' */
+                return _error_handler(pdu, buf, len, -ENOBUFS);
+            }
+            char *file = strrchr(request->namebuf, '/');
+            memmove(file + 2, file + 1, strlen(file + 1));
+            *(file + 1) = '.';
+        }
+        goto unlink_on_error;
+    }
+    if (block1.blknum == 0) {
+        uint32_t size = 0;
+        if (!request->options.exists.size1) {
+            return _error_handler(pdu, buf, len, COAP_CODE_BAD_OPTION);
+        }
+        if (coap_opt_get_uint(pdu, COAP_OPT_SIZE1, &size) < 0) {
+            return _error_handler(pdu, buf, len, COAP_CODE_BAD_OPTION);
+        }
+
+        printf( "DEBUG< size1 option found, "
+                "block1.blknum %" PRIu32 " size is %" PRIu32 "\n",
+                block1.blknum, size);
+        if (_event_file(NANOCOAP_FILESERVER_PUT_FILE_START, request, size) < 0) {
+            return _error_handler(pdu, buf, len, COAP_CODE_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    create = (vfs_stat(request->namebuf, &stat) == -ENOENT);
     if (create) {
         /* While a file 'f' is initially being created,
            we save the partial content in '.f' and rename it afterwards */
@@ -318,10 +359,6 @@ static ssize_t _put_file(coap_pkt_t *pdu, uint8_t *buf, size_t len,
         memmove(file + 2, file + 1, strlen(file + 1));
         *(file + 1) = '.';
     }
-    if (request->options.exists.block1 && !coap_get_block1(pdu, &block1)) {
-        ret = COAP_CODE_BAD_OPTION;
-        goto unlink_on_error;
-    }
     if (block1.blknum == 0) {
         /* "If-None-Match only works correctly on Block1 requests with (NUM=0)
            and MUST NOT be used on Block1 requests with NUM != 0." */
@@ -329,8 +366,6 @@ static ssize_t _put_file(coap_pkt_t *pdu, uint8_t *buf, size_t len,
             ret = COAP_CODE_PRECONDITION_FAILED;
             goto unlink_on_error;
         }
-
-        _event_file(NANOCOAP_FILESERVER_PUT_FILE_START, request);
     }
     if (request->options.exists.if_match) {
         stat_etag(&stat, &etag); /* Etag before write */
@@ -391,7 +426,7 @@ static ssize_t _put_file(coap_pkt_t *pdu, uint8_t *buf, size_t len,
             }
         }
 
-        _event_file(NANOCOAP_FILESERVER_PUT_FILE_END, request);
+        (void)_event_file(NANOCOAP_FILESERVER_PUT_FILE_END, request, 0);
 
         stat_etag(&stat, &etag); /* Etag after write */
         _resp_init(pdu, buf, len, create ? COAP_CODE_CREATED : COAP_CODE_CHANGED);
@@ -431,7 +466,7 @@ static ssize_t _delete_file(coap_pkt_t *pdu, uint8_t *buf, size_t len,
         }
     }
 
-    _event_file(NANOCOAP_FILESERVER_DELETE_FILE, request);
+    (void)_event_file(NANOCOAP_FILESERVER_DELETE_FILE, request, 0);
 
     if ((ret = vfs_unlink(request->namebuf)) < 0) {
         return _error_handler(pdu, buf, len, ret);
@@ -444,6 +479,7 @@ static ssize_t _delete_file(coap_pkt_t *pdu, uint8_t *buf, size_t len,
 static ssize_t nanocoap_fileserver_file_handler(coap_pkt_t *pdu, uint8_t *buf, size_t len,
                                              struct requestdata *request)
 {
+    DEBUG("nanocoap_fileserver_file_handler : request: '%s'\n", request->namebuf);
     switch (coap_get_method(pdu)) {
         case COAP_METHOD_GET:
             return _get_file(pdu, buf, len, request);
@@ -471,6 +507,7 @@ static ssize_t _get_directory(coap_pkt_t *pdu, uint8_t *buf, size_t len,
     if (request->options.exists.block2 && !coap_get_block2(pdu, &block2)) {
         return _error_handler(pdu, buf, len, COAP_OPT_FINISH_NONE);
     }
+    DEBUG("nanocoap_fileserver:_get_directory: request : %s\n", request->namebuf);
     if ((err = vfs_opendir(&dir, request->namebuf)) < 0) {
         return _error_handler(pdu, buf, len, err);
     }
@@ -580,6 +617,7 @@ static ssize_t nanocoap_fileserver_directory_handler(coap_pkt_t *pdu, uint8_t *b
                                                   struct requestdata *request,
                                                   const char *root, const char* resource_dir)
 {
+    DEBUG("nanocoap_fileserver_directory_handler : request: '%s'\n", request->namebuf);
     switch (coap_get_method(pdu)) {
         case COAP_METHOD_GET:
             return _get_directory(pdu, buf, len, request, root, resource_dir);
@@ -703,6 +741,9 @@ ssize_t nanocoap_fileserver_handler(coap_pkt_t *pdu, uint8_t *buf, size_t len,
                         goto error;
                     }
                     request.options.exists.block1 = true;
+                    break;
+                case COAP_OPT_SIZE1:
+                    request.options.exists.size1 = true;
                     break;
                 case COAP_OPT_SIZE2:
                     request.options.exists.size2 = true;

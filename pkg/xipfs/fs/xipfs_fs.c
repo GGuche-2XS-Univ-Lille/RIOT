@@ -138,6 +138,28 @@ static void dirname(char *dir, const char *path)
     }
 }
 
+static int _open_xipfs_infos(const char *path)
+{
+    char dir[XIPFS_PATH_MAX];
+    size_t len;
+
+    if (path[0] != '/') {
+        return -EINVAL;
+    }
+    len = strnlen(path, XIPFS_PATH_MAX);
+    if (len == XIPFS_PATH_MAX) {
+        return -ENAMETOOLONG;
+    }
+    dirname(dir, path);
+
+    if (len + strlen(".xipfs_infos") + 1 > XIPFS_PATH_MAX) {
+        return -ENAMETOOLONG;
+    }
+    (void)strcat(dir, ".xipfs_infos");
+
+    return vfs_open(dir, O_RDONLY, 0);
+}
+
 /**
  * @internal
  *
@@ -160,29 +182,12 @@ static void dirname(char *dir, const char *path)
  */
 static int get_xipfs_mp(const char *path, xipfs_mount_t *xipfs_mp)
 {
-    char dir[XIPFS_PATH_MAX];
-    size_t count, len;
+    size_t count;
     int fd, ret;
 
-    if (path[0] != '/') {
-        return -EINVAL;
-    }
-    len = strnlen(path, XIPFS_PATH_MAX);
-    if (len == XIPFS_PATH_MAX) {
-        return -ENAMETOOLONG;
-    }
-    dirname(dir, path);
-
-    if (len + strlen(".xipfs_infos") + 1 > XIPFS_PATH_MAX) {
-        return -ENAMETOOLONG;
-    }
-    (void)strcat(dir, ".xipfs_infos");
-
-    if ((ret = vfs_open(dir, O_RDONLY, 0)) < 0) {
-        /* not a xipfs mount point */
-        return ret;
-    }
-    fd = ret;
+    fd = _open_xipfs_infos(path);
+    if (fd < 0)
+        return fd;
 
     count = sizeof(*xipfs_mp);
     while (count > 0) {
@@ -572,6 +577,18 @@ static int _statvfs(vfs_mount_t *vfs_mp, const char *restrict path,
 /*
  * xipfs-specific functions
  */
+
+bool xipfs_does_filename_belong_to_known_mountpoint(const char *filename)
+{
+    int fd = _open_xipfs_infos(filename);
+    if (fd > 0)
+    {
+        vfs_close(fd);
+        return true;
+    }
+
+    return false;
+}
 
 int xipfs_extended_driver_new_file(const char *full_path, uint32_t size, uint32_t exec)
 {
