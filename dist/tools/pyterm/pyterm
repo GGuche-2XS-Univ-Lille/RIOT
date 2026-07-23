@@ -39,6 +39,8 @@ import re
 import codecs
 import platform
 import psutil
+import pathlib
+import base64
 
 from subprocess import Popen, PIPE
 from signal import SIGINT
@@ -79,7 +81,8 @@ defaulthostname = platform.node()
 defaultport = "/dev/ttyUSB0"
 
 # default baudrate for serial connection
-defaultbaud = 115200
+#defaultbaud = 115200
+defaultbaud = 9600
 
 # directory to store configuration and log files
 defaultdir = os.environ['HOME'] + os.path.sep + '.pyterm'
@@ -102,6 +105,48 @@ defaultprompt = '>'
 # repeat command on empty line instead of sending the line
 defaultrepeat_cmd_empty_line = True
 defaultreconnect = True
+
+# riot's default shell buffer size
+# see sys/include/shell.h file
+SHELL_DEFAULT_BUFSIZE = 128 - 1
+
+
+def trunc(x, y):
+    return ((x) & ~((y) - 1))
+
+def send_command(self, command):
+#    print(command)
+    if sys.version_info[0] == 2:
+        self.ser.write((command + "\n").decode("utf-8").encode("utf-8"))
+    else:
+        # workaround...
+        for i in command:
+            self.ser.write(i.encode("utf-8"))
+            time.sleep(0.01)
+        self.ser.write("\n".encode("utf-8"))
+        time.sleep(0.01)
+
+def put(self, filename):
+    global SHELL_DEFAULT_BUFSIZE
+    if len(filename) >= 32:
+        return
+    try:
+        with open(filename, 'rb') as f:
+            binstr = f.read()
+            file_size = len(binstr)
+            b64str = base64.b64encode(binstr).decode('ascii')
+    except FileNotFoundError:
+        print(f'put: {filename}: no such file')
+        return
+
+    if pathlib.Path(filename).suffix == '.fae':
+        send_command(self, f'mkbin {filename} {file_size} 1')
+    else:
+        send_command(self, f'mkbin {filename} {file_size} 0')
+
+    chunk_size = trunc(SHELL_DEFAULT_BUFSIZE - len(f'ldbin {filename} '), 4)
+    for chunk in [b64str[i:i+chunk_size] for i in range(0,len(b64str),chunk_size)]:
+        send_command(self, f'ldbin {filename} {chunk}')
 
 
 class SerCmd(cmd.Cmd):
@@ -338,10 +383,16 @@ class SerCmd(cmd.Cmd):
                           "out" % line)
         for tok in line.split(';'):
             tok = self.get_alias(tok)
-            if sys.version_info[0] == 2:
-                self._write_char((tok.strip() + "\n").decode("utf-8").encode("utf-8"))
+            # Special commands
+            if tok.startswith('put'):
+                argv = tok.split(' ')
+                if len(argv) == 2:
+                    put(self, argv[1])
             else:
-                self._write_char((tok.strip() + "\n").encode("utf-8"))
+                if sys.version_info[0] == 2:
+                    self._write_char((tok.strip() + "\n").decode("utf-8").encode("utf-8"))
+                else:
+                    self._write_char((tok.strip() + "\n").encode("utf-8"))
 
     def do_help(self, line):
         """Do not use Cmd's internal help function, but redirect to the

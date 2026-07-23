@@ -107,7 +107,7 @@ extern "C" {
 /**
  * @brief Baudrate for STDIO
  */
-#define STDIO_UART_BAUDRATE     (115200)
+#define STDIO_UART_BAUDRATE     (76800)
 #endif
 
 #ifdef __cplusplus
