@@ -339,9 +339,6 @@ static ssize_t _put_file(coap_pkt_t *pdu, uint8_t *buf, size_t len,
             return _error_handler(pdu, buf, len, COAP_CODE_BAD_OPTION);
         }
 
-        printf( "DEBUG< size1 option found, "
-                "block1.blknum %" PRIu32 " size is %" PRIu32 "\n",
-                block1.blknum, size);
         if (_event_file(NANOCOAP_FILESERVER_PUT_FILE_START, request, size) < 0) {
             return _error_handler(pdu, buf, len, COAP_CODE_INTERNAL_SERVER_ERROR);
         }

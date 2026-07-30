@@ -37,15 +37,14 @@
 #define MAIN_QUEUE_SIZE (4)
 static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
 
-/*static
-XIPFS_START_PARTITION_INCLUSION(nvm0)
-#include "blob/nvme0p0.flash.h"
-XIPFS_END_PARTITION_INCLUSION(nvm0, "/nvm0",nvme0p0_flash, nvme0p0_flash_len);
-*/
-
 #define NVME0P0_PAGE_NUM 10
 
 XIPFS_NEW_PARTITION(nvm0, "/nvm0", NVME0P0_PAGE_NUM);
+
+static
+XIPFS_START_PARTITION_INCLUSION(nvm1)
+#include "blob/nvm1.flash.h"
+XIPFS_END_PARTITION_INCLUSION(nvm1, "/nvm1",nvm1_flash, nvm1_flash_len);
 
 /* CoAP resources. Must be sorted by path (ASCII order). */
 static const coap_resource_t _resources[] = {
@@ -137,19 +136,54 @@ static int _event_cb(nanocoap_fileserver_event_t event, nanocoap_fileserver_even
     return 0;
 }
 
+/**
+ * @internal
+ *
+ * @brief Initialize a VFS XiPFS mountpoint.
+ *
+ * @param[in]   mp The mountpoint to initialize.
+ *
+ * @retval <0 on errors
+ * @retval >=0 otherwise
+ */
+static int init_mount_point(vfs_xipfs_mount_t *mp)
+{
+    if (vfs_mount(&mp->vfs_mp) < 0) {
+        printf("Error: vfs_mount: \"%s\": file system has not been "
+            "initialized or is corrupted\n", mp->vfs_mp.mount_point);
+        return -1;
+    }
+
+    printf("vfs_mount: \"%s\": OK\n", mp->vfs_mp.mount_point);
+    return 0;
+}
+
+/**
+ * @internal
+ *
+ * @brief Initialize all example mountpoints.
+ */
+static void init_mount_points(void)
+{
+    vfs_xipfs_mount_t *mps[2] = {
+        [0] = &nvm0,
+        [1] = &nvm1,
+    };
+    const size_t mps_count = ARRAY_SIZE(mps);
+    for (size_t i = 0; i < mps_count; i++) {
+        if (init_mount_point(mps[i]) < 0) {
+            /* PANIC */
+            for(;;) {}
+        }
+    }
+}
+
 int main(void)
 {
+    init_mount_points();
+
     msg_init_queue(_main_msg_queue, MAIN_QUEUE_SIZE);
     gcoap_register_listener(&_listener);
-
-    if (vfs_mount(&nvm0.vfs_mp) < 0) {
-        printf("vfs_mount: \"%s\": file system has not been "
-               "initialized or is corrupted\n", nvm0.vfs_mp.mount_point);
-        for (;;) {}
-    }
-    else {
-        printf("vfs_mount: \"%s\": OK\n", nvm0.vfs_mp.mount_point);
-    }
 
     if (IS_USED(MODULE_NANOCOAP_FILESERVER_CALLBACK)) {
         nanocoap_fileserver_set_event_cb(_event_cb, NULL);

@@ -31,12 +31,14 @@ USEMODULE += auto_init_gnrc_netif
 USEMODULE += netdev_default
 USEMODULE += gnrc_icmpv6_echo
 
-PREFIX_CONF ?= uhcp
+#PREFIX_CONF ?= uhcp
 
 USEMODULE += stdio_ethos
 
 # include UHCP client
-USEMODULE += gnrc_uhcpc
+# USEMODULE += gnrc_uhcpc
+
+USE_MODULE += gnrc_ipv6_static_addr
 
 USEMODULE += cortexm_svc
 
@@ -52,21 +54,19 @@ CFLAGS += -DXIPFS_ENABLE_SAFE_EXEC_SUPPORT
 # XIPFS MPU ISR stack requirement
 CFLAGS += -DISR_STACKSIZE=1024
 
+# Application feature
 #CFLAGS += -DXIPFS_COAP_CREATE_EXE_ENABLED
 
-BLOBS += nvme0p0.flash
+BLOBS += nvm1.flash
 
 # XIPFS is currently not compatible with the llvm toolchain
 TOOLCHAINS_BLACKLIST += llvm
 
-
 # Change this to 0 show compiler invocation lines by default:
 QUIET ?= 1
 
-# Ethos/native TAP interface and UHCP prefix can be configured from make command
+# Ethos/native TAP interface can be configured from make command
 TAP ?= tap0
-# UHCP advertises the prefix as is.
-IPV6_PREFIX ?= 2001:db8::/64
 
 # MODULE DEPENDENT CONFIGURATION IMPORT
 # =====================================
