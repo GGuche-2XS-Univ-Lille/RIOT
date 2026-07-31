@@ -132,7 +132,7 @@ parse_arguments() {
 # shellcheck disable=SC2329 # code is irrelevant because of indirect invokation in main
 do_upload() {
     echo "Uploading $1 to $target_address/nvm0..."
-    coap-client -m put -v "$verbosity" -f "$1" coap://["$target_address"]/nvm0/"$1"
+    coap-client -m put -b 64 -v "$verbosity" -f "$1" coap://["$target_address"]/nvm0/"$1"
     echo "Upload done."
 }
 
