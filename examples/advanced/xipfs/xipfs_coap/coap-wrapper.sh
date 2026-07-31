@@ -41,30 +41,28 @@ action=
 action_parameter=
 
 usage() {
+    name=$(basename "$0")
+
     printf "\
-Usage: %s [OPTIONS] <ACTIONS>
+Usage:
+  %s [OPTIONS] <ACTIONS>
 
   OPTIONS:
 
     -a|--address=ipv6-addr            Specify the target IPV6 address (with tap interface)
-
     -v|-verbosity=value               Specify coap-client verbosity level (0-9)
 
   ACTIONS:
 
+    -h|--help                         Display this help
     -u|--upload=filename              Upload file to target's /nvm0
-
     -d|--delete=filename              Delete file from target's /nvm0
-
     -r|--get-resources                Retrieve all target's resources
+    -l|--list=path                    Give the directory contents from target
+    -e|--exec=filename_and_args       Execute file on target WITHOUT memory protection
+    -s|--safe-exec=filename_and_args  Execute file on target WITH memory protection
 
-    -l|--list=path                    Give the directory contents from target's /nvm0
-
-    -e|--exec=filename_and_args       Execute file on target's /nvm0 WITHOUT memory protection
-
-    -s|--safe-exec=filename_and_args  Execute file on target's /nvm0 WITH memory protection
-
-" "$0"
+" "$name"
     return 0
 }
 
@@ -84,6 +82,9 @@ parse_arguments() {
         value=${argument#*=}
         flag=${argument%=*}
         case "$flag" in
+            -h|--help)
+                usage && exit 0
+                ;;
             -a|--address)
                 target_address="$value"
                 ;;
@@ -152,7 +153,7 @@ do_get_resources() {
 # shellcheck disable=SC2329 # code is irrelevant because of indirect invokation in main
 do_list() {
     echo "Listing /nvm0$1 contents from $target_address..."
-    coap-client -m get -v "$verbosity" coap://["$target_address"]/nvm0"$1"
+    coap-client -m get -v "$verbosity" coap://["$target_address"]"$1"
     echo "Listing done."
 }
 

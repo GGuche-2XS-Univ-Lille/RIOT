@@ -72,7 +72,13 @@ static const coap_resource_t _resources[] = {
         COAP_DELETE |
 #endif
         COAP_MATCH_SUBTREE,
-      nanocoap_fileserver_handler, "/nvm0"
+        nanocoap_fileserver_handler, "/nvm0"
+    },
+
+    {
+        "/nvm1",
+        COAP_GET | COAP_MATCH_SUBTREE,
+        nanocoap_fileserver_handler, "/nvm1"
     },
 
     {
