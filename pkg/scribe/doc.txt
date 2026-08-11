@@ -1,0 +1,7 @@
+/**
+ * @defgroup pkg_scribe   scribe
+ * @ingroup  pkg
+ * @brief    scribe
+ *
+ * @see      https://github.com/GGuche-2XS-Univ-Lille/scribe/tree/main
+ */

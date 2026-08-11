@@ -1,0 +1,4 @@
+INCLUDES += -I$(PKGDIRBASE)/scribe
+
+# include archive
+ARCHIVES += $(BINDIR)/scribe.a

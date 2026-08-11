@@ -15,6 +15,11 @@ DEVELHELP ?= 1
 # Change this to 0 show compiler invocation lines by default:
 QUIET ?= 1
 
+# Enable COAP support in Scribe
+export COAP := 1
+CFLAGS += -DSCRIBE_COAP_SINK_ENABLED
+USEPKG += scribe
+
 # Modules to include:
 USEMODULE += shell
 USEMODULE += shell_cmds_default
@@ -53,6 +58,8 @@ USEMODULE += xipfs
 CFLAGS += -DXIPFS_ENABLE_SAFE_EXEC_SUPPORT
 # XIPFS MPU ISR stack requirement
 CFLAGS += -DISR_STACKSIZE=1024
+# XIPFS Scribe support
+CFLAGS += -DXIPFS_ENABLE_SCRIBE_SUPPORT
 
 # Application feature
 #CFLAGS += -DXIPFS_COAP_CREATE_EXE_ENABLED

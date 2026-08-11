@@ -7,23 +7,17 @@
 
 #include <stdio.h>
 #include <stdint.h>
-#include <limits.h>
 #include <inttypes.h>
 
 #include "shell.h"
 #include "fs/xipfs_fs.h"
 #include "utils.h"
 
+#include "scribe_output.h"
+
 #define ENABLE_DEBUG 0
 #include "debug.h"
 
-#define STR_HELPER(x) #x
-
-#define STR(x)        STR_HELPER(x)
-
-#define INT_MIN_STR STR(INT_MIN)
-
-static char execute_handler_response_buffer[sizeof(INT_MIN_STR)] = { '\0' };
 static char execute_handler_payload_buffer[SHELL_DEFAULT_BUFSIZE] = { '\0'};
 static char *execute_handler_args[XIPFS_EXEC_ARGC_MAX] = {NULL};
 
@@ -96,11 +90,53 @@ static ssize_t execute_base_handler(coap_pkt_t *pdu, uint8_t *buf, size_t len,
         errorcode = COAP_CODE_METHOD_NOT_ALLOWED;
         goto error;
     }
+/*
+    fprintf(stdout, "DEBUG execute.c CONFIG_NANOCOAP_BLOCKSIZE_DEFAULT : %d\n", CONFIG_NANOCOAP_BLOCKSIZE_DEFAULT);
 
+    fprintf(stdout, "DEBUG execute.c coap pdu.hdr{"
+                    "ver_t_tkl=%" PRIx8 ", code=%" PRIu8 ", id=%" PRIx16
+                    "}\n", pdu->hdr->ver_t_tkl, pdu->hdr->code, pdu->hdr->id);
+
+    coap_block1_t coap_block;
+    int coap_block_found = coap_get_block1(pdu, &coap_block);
+    if (coap_block_found == 1) {
+        fprintf(stdout, "DEBUG execute.c coap block1 FOUND\n");
+        fprintf(stdout,
+                "DEBUG execute.c block "
+                "{offset=%zu, blknum=%" PRIu32 ", szx=%" PRIu8", more:%" PRId8 "}\n",
+                coap_block.offset, coap_block.blknum, coap_block.szx, coap_block.more);
+    } else {
+        fprintf(stdout, "DEBUG execute.c coap block1 NOT found\n");
+    }
+
+    coap_block_found = coap_get_block2(pdu, &coap_block);
+    if (coap_block_found == 1) {
+        fprintf(stdout, "DEBUG execute.c coap block2 FOUND\n");
+        fprintf(stdout,
+                "DEBUG execute.c block "
+                "{offset=%zu, blknum=%" PRIu32 ", szx=%" PRIu8", more:%" PRId8 "}\n",
+                coap_block.offset, coap_block.blknum, coap_block.szx, coap_block.more);
+    } else {
+        fprintf(stdout, "DEBUG execute.c coap block2 NOT found\n");
+    }
+
+    uint32_t opt_tag;
+    int opt_tag_found = coap_opt_get_uint(pdu, COAP_OPT_ETAG, &opt_tag);
+    fprintf(stdout, "DEBUG execute.c coap TAG:");
+    switch (opt_tag_found) {
+        case -ENOENT:  fprintf(stdout, "-ENOENT\n"); break;
+        case -ENOSPC:  fprintf(stdout, "-ENOSPC\n"); break;
+        case -EBADMSG: fprintf(stdout, "-EBADMSG\n"); break;
+        default:
+            fprintf(stdout, "%" PRIx32 "\n", opt_tag);
+            break;
+    }
+*/
     const char *full_path = parse_execute_params(pdu);
     if (full_path == NULL) {
         errorcode = COAP_CODE_BAD_REQUEST;
-error :
+error:
+        /*fprintf(stdout, "DEBUG execute.c KOOOOOOO 1/2\n");*/
         int header_len = coap_build_reply(pdu, errorcode, buf, len, 0);
         if (header_len <= 0) {
             return -1;
@@ -109,32 +145,34 @@ error :
         pdu->options_len = 0;
         pdu->payload     = buf + header_len;
         pdu->payload_len = len - header_len;
+        /*fprintf(stdout, "DEBUG execute.c KOOOOOOO 2/2\n");*/
         return coap_opt_finish(pdu, COAP_OPT_FINISH_NONE);
     }
 
-    int ret = exec_cb(full_path, execute_handler_args);
-    ret = snprintf(execute_handler_response_buffer, sizeof(execute_handler_response_buffer), "%d", ret);
+    /*fprintf(stdout, "DEBUG execute.c OKKKKKKK\n");*/
 
-    DEBUG("execute_base_handler: execute_handler_response_buffer : '%s', ret %d\n",
-           execute_handler_response_buffer, ret);
-
-    coap_block_slicer_t slicer;
-    coap_block2_init(pdu, &slicer);
-
-    gcoap_resp_init(pdu, buf, len, COAP_CODE_CONTENT);
-    coap_opt_add_format(pdu, COAP_FORMAT_TEXT);
-    coap_opt_add_block2(pdu, &slicer, 1);
-    ssize_t plen = coap_opt_finish(pdu, COAP_OPT_FINISH_PAYLOAD);
-
-    if (coap_blockwise_put_bytes_pkt(pdu, &slicer,
-                                     execute_handler_response_buffer, ret)) {
+    ssize_t scribe_output_res = scribe_output_prepare(pdu, buf, len);
+    if (scribe_output_res < 0) {
+        fprintf(stderr, "execute_base_handler: scribe_output_prepare : %zd\n", scribe_output_res);
+        scribe_output_res = gcoap_response(pdu, buf, len, COAP_CODE_INTERNAL_SERVER_ERROR);
         fprintf(stderr,
-                "execute_base_handler: failed to put bytes in packet\n");
-        return ret;
+                "execute_base_handler: scribe_output_prepare : after coap response : %zd\n",
+                scribe_output_res);
+        goto exit;
     }
 
-    coap_block2_finish(&slicer);
-    return plen + ret;
+    int exe_return_value = exec_cb(full_path, execute_handler_args);
+    /* printf("execute_base_handler: exe_return_value : %d\n", exe_return_value); */
+
+    scribe_output_res = scribe_output_commit(exe_return_value);
+    if (scribe_output_res < 0) {
+        fprintf(stderr, "execute_base_handler: scribe_output_commit : %zd\n", scribe_output_res);
+        scribe_output_res = gcoap_response(pdu, buf, len, COAP_CODE_INTERNAL_SERVER_ERROR);
+        fprintf(stderr, "execute_base_handler: scribe_output_commit : after coap response : %zd\n",
+                scribe_output_res);
+    }
+exit:
+    return scribe_output_res;
 }
 
 ssize_t execute_handler(coap_pkt_t *pdu, uint8_t *buf, size_t len,

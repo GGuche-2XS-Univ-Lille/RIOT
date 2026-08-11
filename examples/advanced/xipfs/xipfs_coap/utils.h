@@ -8,6 +8,10 @@
 
 #include <stdint.h>
 
+#define XIPFS_STR_HELPER(x) #x
+
+#define XIPFS_STR(x)        XIPFS_STR_HELPER(x)
+
 #ifndef XIPFS_COAP_DEFAULT_SEPARATOR
 #define XIPFS_COAP_DEFAULT_SEPARATOR ' '
 #endif

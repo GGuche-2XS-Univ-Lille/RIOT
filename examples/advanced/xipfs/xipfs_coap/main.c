@@ -33,6 +33,7 @@
 
 #include "create_exe.h"
 #include "execute.h"
+#include "scribe_output.h"
 
 #define MAIN_QUEUE_SIZE (4)
 static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
@@ -184,8 +185,11 @@ static void init_mount_points(void)
     }
 }
 
-int main(void)
+static int initialize(int argc, const char *argv[])
 {
+    (void)argc;
+    (void)argv;
+
     init_mount_points();
 
     msg_init_queue(_main_msg_queue, MAIN_QUEUE_SIZE);
@@ -195,8 +199,31 @@ int main(void)
         nanocoap_fileserver_set_event_cb(_event_cb, NULL);
     }
 
+    int res = scribe_output_initialize(argc, argv);
+    if (res < 0) {
+        printf("%s:initialize: Failed to initialize scribe: %d\n", argv[0], res);
+        return -res;
+    }
+
+    return 0;
+}
+
+static void shutdown(int argc, const char *argv[]) {
+    (void)argc;
+    (void)argv;
+
+    scribe_output_release();
+}
+
+int main(int argc, const char *argv[])
+{
+    int res = initialize(argc, argv);
+    if (res != 0) {
+        return res;
+    }
     char line_buf[SHELL_DEFAULT_BUFSIZE];
     shell_run(NULL, line_buf, SHELL_DEFAULT_BUFSIZE);
 
+    shutdown(argc, argv);
     return 0;
 }

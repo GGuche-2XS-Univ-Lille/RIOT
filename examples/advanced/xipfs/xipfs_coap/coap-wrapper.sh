@@ -62,7 +62,10 @@ Usage:
     -e|--exec=filename_and_args       Execute file on target WITHOUT memory protection
     -s|--safe-exec=filename_and_args  Execute file on target WITH memory protection
 
-" "$name"
+  DEFAULT VALUES:
+    - target_address=%s
+    - verbosity=%s
+" "$name" "$target_address" "$verbosity"
     return 0
 }
 

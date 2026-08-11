@@ -719,16 +719,22 @@ static int copy_file(const char *full_path, void *buf, size_t nbyte) {
 extern void xipfs_exec_exit(int status);
 
 static const void *xipfs_extended_driver_execv_syscalls[XIPFS_SYSCALL_MAX] = {
-    [         XIPFS_SYSCALL_EXIT] = xipfs_exec_exit,
-    [      XIPFS_SYSCALL_VPRINTF] = vprintf,
-    [     XIPFS_SYSCALL_GET_TEMP] = get_temperature,
-    [      XIPFS_SYSCALL_ISPRINT] = isprint,
-    [       XIPFS_SYSCALL_STRTOL] = strtol,
-    [      XIPFS_SYSCALL_GET_LED] = get_led,
-    [      XIPFS_SYSCALL_SET_LED] = set_led,
-    [    XIPFS_SYSCALL_COPY_FILE] = copy_file,
-    [XIPFS_SYSCALL_GET_FILE_SIZE] = get_file_size,
-    [       XIPFS_SYSCALL_MEMSET] = memset
+    [                  XIPFS_SYSCALL_EXIT] = xipfs_exec_exit,
+    [               XIPFS_SYSCALL_VPRINTF] = vprintf,
+    [              XIPFS_SYSCALL_GET_TEMP] = get_temperature,
+    [               XIPFS_SYSCALL_ISPRINT] = isprint,
+    [                XIPFS_SYSCALL_STRTOL] = strtol,
+    [               XIPFS_SYSCALL_GET_LED] = get_led,
+    [               XIPFS_SYSCALL_SET_LED] = set_led,
+    [             XIPFS_SYSCALL_COPY_FILE] = copy_file,
+    [         XIPFS_SYSCALL_GET_FILE_SIZE] = get_file_size,
+    [                XIPFS_SYSCALL_MEMSET] = memset,
+    [                XIPFS_SYSCALL_STRLEN] = strlen,
+    [             XIPFS_SYSCALL_VSNPRINTF] = vsnprintf,
+#ifdef XIPFS_ENABLE_SCRIBE_SUPPORT
+    [          XIPFS_SYSCALL_SCRIBE_WRITE] = scribe_write,
+    [ XIPFS_SYSCALL_SCRIBE_CODE_GET_LABEL] = scribe_code_get_label,
+#endif /* XIPFS_ENABLE_SCRIBE_SUPPORT */
 };
 
 int xipfs_extended_driver_execv(const char *full_path, char *const argv[])
@@ -796,16 +802,22 @@ int svc_dispatch_handler(unsigned int svc_number, unsigned int *svc_args)
 extern void xipfs_safe_exec_exit(int status);
 
 static const void *xipfs_extended_driver_safe_execv_syscalls[XIPFS_SYSCALL_MAX] = {
-    [         XIPFS_SYSCALL_EXIT] = xipfs_safe_exec_exit,
-    [      XIPFS_SYSCALL_VPRINTF] = vprintf,
-    [     XIPFS_SYSCALL_GET_TEMP] = get_temperature,
-    [      XIPFS_SYSCALL_ISPRINT] = isprint,
-    [       XIPFS_SYSCALL_STRTOL] = strtol,
-    [      XIPFS_SYSCALL_GET_LED] = get_led,
-    [      XIPFS_SYSCALL_SET_LED] = set_led,
-    [    XIPFS_SYSCALL_COPY_FILE] = copy_file,
-    [XIPFS_SYSCALL_GET_FILE_SIZE] = get_file_size,
-    [       XIPFS_SYSCALL_MEMSET] = memset
+    [                  XIPFS_SYSCALL_EXIT] = xipfs_safe_exec_exit,
+    [               XIPFS_SYSCALL_VPRINTF] = vprintf,
+    [              XIPFS_SYSCALL_GET_TEMP] = get_temperature,
+    [               XIPFS_SYSCALL_ISPRINT] = isprint,
+    [                XIPFS_SYSCALL_STRTOL] = strtol,
+    [               XIPFS_SYSCALL_GET_LED] = get_led,
+    [               XIPFS_SYSCALL_SET_LED] = set_led,
+    [             XIPFS_SYSCALL_COPY_FILE] = copy_file,
+    [         XIPFS_SYSCALL_GET_FILE_SIZE] = get_file_size,
+    [                XIPFS_SYSCALL_MEMSET] = memset,
+    [                XIPFS_SYSCALL_STRLEN] = strlen,
+    [             XIPFS_SYSCALL_VSNPRINTF] = vsnprintf,
+#ifdef XIPFS_ENABLE_SCRIBE_SUPPORT
+    [          XIPFS_SYSCALL_SCRIBE_WRITE] = scribe_write,
+    [ XIPFS_SYSCALL_SCRIBE_CODE_GET_LABEL] = scribe_code_get_label,
+#endif /* XIPFS_ENABLE_SCRIBE_SUPPORT */
 };
 
 int xipfs_extended_driver_safe_execv(const char *full_path, char *const argv[])
