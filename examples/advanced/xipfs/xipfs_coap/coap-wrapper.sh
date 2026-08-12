@@ -36,7 +36,7 @@
 set -e
 
 target_address='fe80::e416:6ff:fe66:7bf7%tap0'
-verbosity='6'
+verbosity='3'
 action=
 action_parameter=
 
@@ -135,7 +135,9 @@ parse_arguments() {
 # shellcheck disable=SC2329 # code is irrelevant because of indirect invokation in main
 do_upload() {
     echo "Uploading $1 to $target_address/nvm0..."
-    coap-client -m put -b 64 -v "$verbosity" -f "$1" coap://["$target_address"]/nvm0/"$1"
+    absolute_filename=$(realpath "$1")
+    base_filename=$(basename "$absolute_filename")
+    coap-client -m put -b 64 -v "$verbosity" -f "$absolute_filename" coap://["$target_address"]/nvm0/"$base_filename"
     echo "Upload done."
 }
 

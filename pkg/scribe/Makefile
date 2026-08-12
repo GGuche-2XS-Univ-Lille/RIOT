@@ -1,6 +1,6 @@
 PKG_NAME=scribe
 PKG_URL=https://github.com/GGuche-2XS-Univ-Lille/scribe.git
-PKG_VERSION=8c05e3fe0031bf569727a51a10b8b415fb517e29
+PKG_VERSION=fe282b322756d6c34af84360569f8bbe8ef23196
 PKG_LICENSE=MIT
 
 include $(RIOTBASE)/pkg/pkg.mk
