@@ -3,6 +3,9 @@
 #  © Université de Lille, The Pip Development Team (2015-2026)                #
 #  Copyright (C) 2020-2025 Orange                                             #
 #                                                                             #
+#  This software is a computer program whose purpose is to run a minimal,     #
+#  hypervisor relying on proven properties such as memory isolation.          #
+#                                                                             #
 #  This software is governed by the CeCILL license under French law and       #
 #  abiding by the rules of distribution of free software.  You can  use,      #
 #  modify and/ or redistribute the software under the terms of the CeCILL     #
@@ -36,8 +39,10 @@ target_address=
 target_address_default='fe80::e416:6ff:fe66:7bf7%tap0'
 verbosity=
 verbosity_default='3'
-action=
-action_parameter=
+path_to_example=
+path_to_example_default='../../../../../riot-xipfs-demonstrations/22-scribe-temperature/'
+which_scale=
+which_scale_default='--celsius'
 
 usage() {
     name=$(basename "$0")
@@ -48,24 +53,30 @@ Usage:
 
   OPTIONS:
 
-    -a|--address=ipv6-addr            Specify the target IPV6 address (with tap interface)
-    -v|-verbosity=value               Specify coap-client verbosity level (0-9)
+    -p|--path-to-example=path   Specify the path to scribe-temperature directory (build folder and filename will be deduced automatically)
+    -c|-C|--celsius             Build scribe-temperature with Celsius scale
+    -k|-K|--kelvin              Build scribe-temperature with Kelvin scale
+    -a|--address=ipv6-addr      Specify the target IPV6 address (with tap interface)
+    -v|-verbosity=value         Specify coap-client verbosity level (0-9)
 
   ACTIONS:
 
-    -h|--help                         Display this help
-    -u|--upload=filename              Upload file to target's /nvm0
-    -d|--delete=filename              Delete file from target's /nvm0
-    -r|--get-resources                Retrieve all target's resources
-    -l|--list=path                    Give the directory contents from target
-    -e|--exec=filename_and_args       Execute file on target WITHOUT memory protection
-    -s|--safe-exec=filename_and_args  Execute file on target WITH memory protection
+    -h|--help                   Display this help
 
   DEFAULT VALUES:
+    - path_to_example=%s
     - target_address=%s
     - verbosity=%s
-" "$name" "$target_address_default" "$verbosity_default"
+    - which_scale=%s
+" "$name" "$path_to_example_default" "$target_address_default" "$verbosity_default" "$which_scale_default"
     return 0
+}
+
+check_path_not_set() {
+    if [ -n "$path_to_example" ] ; then
+        echo "Path is defined more than once in command line."
+        usage && exit 1
+    fi
 }
 
 check_target_address_not_set() {
@@ -82,12 +93,13 @@ check_verbosity_not_set() {
     fi
 }
 
-check_action_not_set() {
-    if [ -n "$action" ] ; then
-        echo "Only one single action is allowed in command line."
+check_scale_not_set() {
+    if [ -n "$which_scale" ] ; then
+        echo "Only one scale is allowed in command line."
         usage && exit 1
     fi
 }
+
 
 parse_arguments() {
 #    local value
@@ -109,34 +121,13 @@ parse_arguments() {
                 check_verbosity_not_set
                 verbosity="$value"
                 ;;
-            -u|--upload)
-                check_action_not_set
-                action=do_upload
-                action_parameter="$value"
+            -p|--path-to-example)
+                check_path_not_set
+                path_to_example="$value"
                 ;;
-            -d|--delete)
-                check_action_not_set
-                action=do_delete
-                action_parameter="$value"
-                ;;
-            -r|--get-resources)
-                check_action_not_set
-                action=do_get_resources
-                ;;
-            -l|--list)
-                check_action_not_set
-                action=do_list
-                action_parameter="$value"
-                ;;
-            -e|--exec)
-                check_action_not_set
-                action=do_exec
-                action_parameter="$value"
-                ;;
-            -s|--safe-exec)
-                check_action_not_set
-                action=do_safe_exec
-                action_parameter="$value"
+            -c|-C|--celsius|-k|-K|--kelvin)
+                check_scale_not_set
+                which_scale="$flag"
                 ;;
             *)
                 echo "Invalid argument in command line '$flag'."
@@ -148,60 +139,27 @@ parse_arguments() {
 }
 
 # shellcheck disable=SC2329 # code is irrelevant because of indirect invokation in main
+# "$path_to_example" "$which_scale" "$target_address" "$verbosity"
 do_upload() {
-    echo "Uploading $1 to $target_address/nvm0..."
-    absolute_filename=$(realpath "$1")
-    base_filename=$(basename "$absolute_filename")
-    coap-client -m put -b 64 -v "$verbosity" -f "$absolute_filename" coap://["$target_address"]/nvm0/"$base_filename"
-    echo "Upload done."
+    base_filename=scribe-temperature.fae
+    complete_filename="${1%/}"/build/"$base_filename"
+    build-scribe-temperature.sh --path-to-example="$1" "$2"
+    coap-wrapper.sh -d="$base_filename" -a="$3" -v="$4"
+    time -f "%E (real)" coap-wrapper.sh -u="$complete_filename" -a="$3" -v="$4"
 }
 
-# shellcheck disable=SC2329 # code is irrelevant because of indirect invokation in main
-do_delete() {
-    echo "Deleting $1 from $target_address/nvm0..."
-    coap-client -m delete -v "$verbosity" coap://["$target_address"]/nvm0/"$1"
-    echo "Deletion done."
-}
-
-# shellcheck disable=SC2329 # code is irrelevant because of indirect invokation in main
-do_get_resources() {
-    echo "Getting all $target_address COAP ressources..."
-    coap-client -m get -v "$verbosity" coap://["$target_address"]/.well-known/core
-    echo "Done."
-}
-
-# shellcheck disable=SC2329 # code is irrelevant because of indirect invokation in main
-do_list() {
-    echo "Listing /nvm0$1 contents from $target_address..."
-    coap-client -m get -v "$verbosity" coap://["$target_address"]"$1"
-    echo "Listing done."
-}
-
-# shellcheck disable=SC2329 # code is irrelevant because of indirect invokation in main
-do_exec() {
-    echo "Executing '$*' WITHOUT MPU enabled from $target_address..."
-    coap-client -m get -e "$*" -v "$verbosity" coap://["$target_address"]/execution
-    echo "Execution done."
-}
-
-# shellcheck disable=SC2329 # code is irrelevant because of indirect invokation in main
-do_safe_exec() {
-    echo "Executing '$*' WITH MPU enabled from $target_address..."
-    coap-client -m get -e "$*" -v "$verbosity" coap://["$target_address"]/safe_execution
-    echo "Execution done."
-}
 
 main() {
-    if [ "$#" -lt 1 ] || [ "$#" -gt 3 ]; then
+    if [ "$#" -lt 0 ] || [ "$#" -gt 4 ]; then
         usage
         exit 1
     fi
 
     parse_arguments "$@"
 
-    if [ -z "$action" ] ; then
-        echo "At least one single action is needed in command line."
-        usage && exit 1
+    if [ -z "$path_to_example" ] ; then
+        path_to_example=$path_to_example_default
+        echo "Path is not defined in command line, fallback to $path_to_example."
     fi
 
     if [ -z "$target_address" ] ; then
@@ -214,7 +172,12 @@ main() {
         echo "verbosity is not defined in command line, fallback to $verbosity."
     fi
 
-    $action "$action_parameter"
+    if [ -z "$which_scale" ] ; then
+        which_scale=$which_scale_default
+        echo "Scale is not defined in command line, fallback to $which_scale."
+    fi
+
+    do_upload "$path_to_example" "$which_scale" "$target_address" "$verbosity"
 
     exit 0
 }

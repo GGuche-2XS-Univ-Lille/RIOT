@@ -1,10 +1,7 @@
 #!/bin/sh
 ###############################################################################
 #  © Université de Lille, The Pip Development Team (2015-2026)                #
-#  Copyright (C) 2020-2025 Orange                                             #
-#                                                                             #
-#  This software is a computer program whose purpose is to run a minimal,     #
-#  hypervisor relying on proven properties such as memory isolation.          #
+#  Copyright (C) 2020-2026 Orange                                             #
 #                                                                             #
 #  This software is governed by the CeCILL license under French law and       #
 #  abiding by the rules of distribution of free software.  You can  use,      #
@@ -35,7 +32,8 @@
 
 set -e
 
-path_to_example='../../../../../riot-xipfs-demonstrations/22-scribe-temperature/'
+path_to_example=
+path_to_example_default='../../../../../riot-xipfs-demonstrations/22-scribe-temperature/'
 which_scale=
 which_scale_default='TEMPERATURE_SCALE_CELSIUS=1'
 
@@ -59,13 +57,20 @@ Usage:
   DEFAULT VALUES:
     - path_to_example=%s
     - which_scale=%s
-" "$name" "$path_to_example" "$which_scale_default"
+" "$name" "$path_to_example_default" "$which_scale_default"
     return 0
 }
 
 check_scale_not_set() {
     if [ -n "$which_scale" ] ; then
         echo "Scale is defined more than once in command line."
+        usage && exit 1
+    fi
+}
+
+check_path_not_set() {
+    if [ -n "$path_to_example" ] ; then
+        echo "Path is defined more than once in command line."
         usage && exit 1
     fi
 }
@@ -83,6 +88,7 @@ parse_arguments() {
                 usage && exit 0
                 ;;
             -p|--path-to-example)
+                check_path_not_set
                 path_to_example="$value"
                 ;;
             -c|-C|--celsius)
@@ -102,9 +108,17 @@ parse_arguments() {
     return 0
 }
 
+display_stats() {
+    stat -c "%-48n %s bytes" "$1"
+}
+
+list_build_artifacts() {
+    echo && display_stats ./build/*.fae && display_stats ./build/*.elf && display_stats ./build/gdbinit && echo
+}
+
 # shellcheck disable=SC2329 # code is irrelevant because of indirect invokation in main
 do_build() {
-    cd "$path_to_example" && make realclean && make "$1" && cd -
+    cd "$1" && make realclean && make "$2" && list_build_artifacts && cd -
 }
 
 main() {
@@ -116,11 +130,16 @@ main() {
     parse_arguments "$@"
 
     if [ -z "$which_scale" ] ; then
-        echo "Scale is not defined in command line, fallback to --celsius."
         which_scale=$which_scale_default
+        echo "Scale is not defined in command line, fallback to --celsius."
     fi
 
-    do_build "$which_scale"
+    if [ -z "$path_to_example" ] ; then
+        path_to_example=$path_to_example_default
+        echo "Path is not defined in command line, fallback to $path_to_example."
+    fi
+
+    do_build "$path_to_example" "$which_scale"
 
     exit 0
 }

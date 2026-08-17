@@ -108,7 +108,7 @@ static int _event_cb(nanocoap_fileserver_event_t event, nanocoap_fileserver_even
         if (xipfs_does_filename_belong_to_known_mountpoint(ctx->path)) {
             uint32_t exec_rights = 0;
             size_t path_len = strlen(ctx->path);
-            printf("gcoap fileserver: DEBUG: path: %s\n", ctx->path);
+            /* printf("gcoap fileserver: DEBUG: path: %s\n", ctx->path); */
             if (path_len > 4) {
                 if ( (ctx->path[path_len - 1] == 'e') &&
                      (ctx->path[path_len - 2] == 'a') &&
