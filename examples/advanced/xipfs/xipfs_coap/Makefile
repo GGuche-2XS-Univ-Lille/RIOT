@@ -64,7 +64,9 @@ CFLAGS += -DXIPFS_ENABLE_SCRIBE_SUPPORT
 # Application feature
 #CFLAGS += -DXIPFS_COAP_CREATE_EXE_ENABLED
 
+BLOBS += nvm0.flash
 BLOBS += nvm1.flash
+
 
 # XIPFS is currently not compatible with the llvm toolchain
 TOOLCHAINS_BLACKLIST += llvm
