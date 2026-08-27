@@ -90,53 +90,11 @@ static ssize_t execute_base_handler(coap_pkt_t *pdu, uint8_t *buf, size_t len,
         errorcode = COAP_CODE_METHOD_NOT_ALLOWED;
         goto error;
     }
-/*
-    fprintf(stdout, "DEBUG execute.c CONFIG_NANOCOAP_BLOCKSIZE_DEFAULT : %d\n", CONFIG_NANOCOAP_BLOCKSIZE_DEFAULT);
 
-    fprintf(stdout, "DEBUG execute.c coap pdu.hdr{"
-                    "ver_t_tkl=%" PRIx8 ", code=%" PRIu8 ", id=%" PRIx16
-                    "}\n", pdu->hdr->ver_t_tkl, pdu->hdr->code, pdu->hdr->id);
-
-    coap_block1_t coap_block;
-    int coap_block_found = coap_get_block1(pdu, &coap_block);
-    if (coap_block_found == 1) {
-        fprintf(stdout, "DEBUG execute.c coap block1 FOUND\n");
-        fprintf(stdout,
-                "DEBUG execute.c block "
-                "{offset=%zu, blknum=%" PRIu32 ", szx=%" PRIu8", more:%" PRId8 "}\n",
-                coap_block.offset, coap_block.blknum, coap_block.szx, coap_block.more);
-    } else {
-        fprintf(stdout, "DEBUG execute.c coap block1 NOT found\n");
-    }
-
-    coap_block_found = coap_get_block2(pdu, &coap_block);
-    if (coap_block_found == 1) {
-        fprintf(stdout, "DEBUG execute.c coap block2 FOUND\n");
-        fprintf(stdout,
-                "DEBUG execute.c block "
-                "{offset=%zu, blknum=%" PRIu32 ", szx=%" PRIu8", more:%" PRId8 "}\n",
-                coap_block.offset, coap_block.blknum, coap_block.szx, coap_block.more);
-    } else {
-        fprintf(stdout, "DEBUG execute.c coap block2 NOT found\n");
-    }
-
-    uint32_t opt_tag;
-    int opt_tag_found = coap_opt_get_uint(pdu, COAP_OPT_ETAG, &opt_tag);
-    fprintf(stdout, "DEBUG execute.c coap TAG:");
-    switch (opt_tag_found) {
-        case -ENOENT:  fprintf(stdout, "-ENOENT\n"); break;
-        case -ENOSPC:  fprintf(stdout, "-ENOSPC\n"); break;
-        case -EBADMSG: fprintf(stdout, "-EBADMSG\n"); break;
-        default:
-            fprintf(stdout, "%" PRIx32 "\n", opt_tag);
-            break;
-    }
-*/
     const char *full_path = parse_execute_params(pdu);
     if (full_path == NULL) {
         errorcode = COAP_CODE_BAD_REQUEST;
 error:
-        /*fprintf(stdout, "DEBUG execute.c KOOOOOOO 1/2\n");*/
         int header_len = coap_build_reply(pdu, errorcode, buf, len, 0);
         if (header_len <= 0) {
             return -1;
@@ -145,11 +103,8 @@ error:
         pdu->options_len = 0;
         pdu->payload     = buf + header_len;
         pdu->payload_len = len - header_len;
-        /*fprintf(stdout, "DEBUG execute.c KOOOOOOO 2/2\n");*/
         return coap_opt_finish(pdu, COAP_OPT_FINISH_NONE);
     }
-
-    /*fprintf(stdout, "DEBUG execute.c OKKKKKKK\n");*/
 
     ssize_t scribe_output_res = scribe_output_prepare(pdu, buf, len);
     if (scribe_output_res < 0) {

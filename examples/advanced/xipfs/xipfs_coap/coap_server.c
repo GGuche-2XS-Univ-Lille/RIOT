@@ -13,13 +13,13 @@
 
 /* CoAP resources. Must be sorted by path (ASCII order). */
 static const coap_resource_t _resources[] = {
-    #ifdef XIPFS_COAP_CREATE_EXE_ENABLED
+#ifdef XIPFS_COAP_CREATE_EXE_ENABLED
     {
         "/create_exe",
         COAP_PUT | COAP_MATCH_SUBTREE,
         create_exe_handler, NULL
     },
-    #endif /* XIPFS_COAP_CREATE_EXE_ENABLED */
+#endif /* XIPFS_COAP_CREATE_EXE_ENABLED */
 
     {
         "/execution",
@@ -30,20 +30,14 @@ static const coap_resource_t _resources[] = {
     {
         "/nvm0",
         COAP_GET |
-        #if IS_USED(MODULE_NANOCOAP_FILESERVER_PUT)
+#if IS_USED(MODULE_NANOCOAP_FILESERVER_PUT)
         COAP_PUT |
-        #endif
-        #if IS_USED(MODULE_NANOCOAP_FILESERVER_DELETE)
+#endif
+#if IS_USED(MODULE_NANOCOAP_FILESERVER_DELETE)
         COAP_DELETE |
-        #endif
+#endif
         COAP_MATCH_SUBTREE,
         nanocoap_fileserver_handler, "/nvm0"
-    },
-
-    {
-        "/nvm1",
-        COAP_GET | COAP_MATCH_SUBTREE,
-        nanocoap_fileserver_handler, "/nvm1"
     },
 
     {
@@ -68,17 +62,17 @@ static int _event_cb(nanocoap_fileserver_event_t event, nanocoap_fileserver_even
             printf("gcoap fileserver: Download finished: %s\n", ctx->path);
             break;
         case NANOCOAP_FILESERVER_PUT_FILE_START:
-            #ifndef XIPFS_COAP_CREATE_EXE_ENABLED
+#ifndef XIPFS_COAP_CREATE_EXE_ENABLED
             if (xipfs_does_filename_belong_to_known_mountpoint(ctx->path)) {
                 uint32_t exec_rights = 0;
                 size_t path_len = strlen(ctx->path);
                 /* printf("gcoap fileserver: DEBUG: path: %s\n", ctx->path); */
                 if (path_len > 4) {
-                    if ( (ctx->path[path_len - 1] == 'e') &&
+                    if ((ctx->path[path_len - 1] == 'e') &&
                         (ctx->path[path_len - 2] == 'a') &&
                         (ctx->path[path_len - 3] == 'f') &&
                         (ctx->path[path_len - 4] == '.') ) {
-                        exec_rights = true;
+                            exec_rights = true;
                         }
                 }
                 int ret = xipfs_extended_driver_new_file( ctx->path,
@@ -90,7 +84,7 @@ static int _event_cb(nanocoap_fileserver_event_t event, nanocoap_fileserver_even
                     return -1;
                 }
             }
-            #endif
+#endif
             printf("gcoap fileserver: Upload started: %s\n", ctx->path);
             break;
         case NANOCOAP_FILESERVER_PUT_FILE_END:

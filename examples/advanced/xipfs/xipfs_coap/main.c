@@ -36,16 +36,10 @@ XIPFS_START_PARTITION_INCLUSION(nvm0)
 #include "blob/nvm0.flash.h"
 XIPFS_END_PARTITION_INCLUSION(nvm0, "/nvm0",nvm0_flash, nvm0_flash_len);
 
-static
-XIPFS_START_PARTITION_INCLUSION(nvm1)
-#include "blob/nvm1.flash.h"
-XIPFS_END_PARTITION_INCLUSION(nvm1, "/nvm1",nvm1_flash, nvm1_flash_len);
-
 static int initialize(int argc, const char *argv[])
 {
-    vfs_xipfs_mount_t *mps[2] = {
+    vfs_xipfs_mount_t *mps[1] = {
         [0] = &nvm0,
-        [1] = &nvm1,
     };
 
     const size_t mps_count = ARRAY_SIZE(mps);
