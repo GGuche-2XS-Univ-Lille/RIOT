@@ -29,8 +29,6 @@ cleanup() {
     trap "" INT QUIT TERM EXIT
 }
 
-echo DEBUG< $0 $1 $2
-
 PORT=$1
 TAP=$2
 BAUDRATE=115200
